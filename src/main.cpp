@@ -8,7 +8,7 @@ unsigned char status_led=0;
 WiFiServer server(80);
 
 void setup() {
-  Serial.begin(115200);                   
+  Serial.begin(9600);                   
   pinMode(LED, OUTPUT);
   digitalWrite(LED, LOW);
 
@@ -18,8 +18,8 @@ void setup() {
   Serial.println(ssid);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
-  delay(500);
-  Serial.print(".");
+    delay(500);
+    Serial.print(".");
   }
   Serial.println("");
   Serial.println("WiFi connected");
@@ -74,4 +74,7 @@ void loop() {
   client.println("<p><a href=\"/ledon\"><button class=\"button\">ON</button></a></p>");
   client.println("<p><a href=\"/ledoff\"><button class=\"button2\">");
   client.println("</body></html>");
+  delay(1);
+  Serial.println("Client disonnected");
+  Serial.println("");
 }
