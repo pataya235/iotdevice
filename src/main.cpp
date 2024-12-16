@@ -1,11 +1,54 @@
 #include<Arduino.h>
 #include<ESP8266WiFi.h>
+#include<PubSubClient.h>
 
 #define LED LED_BUILTIN
 const char* ssid = "ssid";
 const char* password = "password";
-unsigned char status_led=0;
+const char* mqtt_server = "broker_ip";
+const int mqtt_port = 1883;
+const char* mqtt_user = "mqtt_user";
+const char* mqtt_password = "mqtt_password";
+const char* mqtt_topic = "led_control";
 WiFiServer server(80);
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+
+void mqttCallback(char* topic, byte* payload, int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+
+  String message = "";
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+
+  Serial.println(message);
+
+  if (message == "on") {
+    digitalWrite(LED, HIGH);
+  }
+  else if (message == "off") {
+    digitalWrite(LED, LOW);
+  }
+}
+
+void reconnect() {
+  while (!mqttClient.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    if (mqttClient.connect("ESP8266Client", mqtt_user, mqtt_password)) {
+      Serial.println("connected");
+      mqttClient.subscribe(mqtt_topic);
+    }
+    else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
+}
 
 void setup() {
   Serial.begin(9600);                   
@@ -25,52 +68,16 @@ void setup() {
   Serial.println("WiFi connected");
 
   server.begin();
-  Serial.println("Server started at...");
+  Serial.print("Received IP...");
   Serial.println(WiFi.localIP());
+
+  mqttClient.setServer(mqtt_server, mqtt_port);
+  mqttClient.setCallback(mqttCallback);
 }
 
-
 void loop() {
-  WiFiClient client = server.available();
-  if (!client) {
-    return;
+  if (!mqttClient.connected()) {
+    reconnect();
   }
-
-  Serial.println("Client connected");
-  String req = client.readStringUntil('\r');
-  Serial.println(req);
-  client.flush();
-
-  if (req.indexOf("/ledoff") != -1) {
-    status_led=1;
-    digitalWrite(LED, HIGH);
-    Serial.println("LED OFF");
-  }
-  else if(req.indexOf("/ledon") != -1)
-  {
-    status_led=0;
-    digitalWrite(LED,LOW);
-    Serial.println("LED ON");
-  }
-
-  client.println("<!DOCTYPE HTML>");
-  client.println("<html>");
-  client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-  client.println("<link rel=\"icon\" href=\"data:,\">");
-  // CSS to style the on/off buttons
-  client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-  client.println(".button { background-color: #FF0000; border: none; color: white; padding: 16px 40px;");
-  client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-  client.println(".button2 {background-color: #008000; border: none; color: white; padding: 16px 40px;");
-  client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-  client.println("</style></head>");
-  // Web Page Heading
-  client.println("<body><h1>LED CONTROL</h1>");
-  // Display and ON/OFF buttons
-  client.println("<p><a href=\"/ledon\"><button class=\"button\">ON</button></a></p>");
-  client.println("<p><a href=\"/ledoff\"><button class=\"button2\">OFF</button></a></p>");
-  client.println("</body></html>");
-
-  client.stop();
-  Serial.println("Client Disconnected");
+  mqttClient.loop();
 }
